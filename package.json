@@ -1,0 +1,30 @@
+{
+  "name": "gst-report-generator-web",
+  "version": "1.0.0",
+  "description": "GST Report Generator - Web Application for Indian Businesses",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "build": "echo 'Static files ready for deployment'",
+    "deploy": "echo 'Ready for web hosting'"
+  },
+  "keywords": [
+    "GST",
+    "India",
+    "Tax",
+    "Report",
+    "Generator",
+    "Amazon",
+    "Meesho",
+    "GSTR1"
+  ],
+  "author": "GST Report Generator",
+  "license": "Commercial",
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

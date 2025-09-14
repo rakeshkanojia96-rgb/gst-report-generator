@@ -1,6 +1,4 @@
-console.log('🔥 FORCE RELOAD v100031 - TIMESTAMP: ' + new Date().toISOString());
-console.log('🔥 TESTING IF THIS MESSAGE APPEARS IN CONSOLE');
-alert('🔥 FORCE RELOAD v100031 - EXCEL FILENAME CHANGED TO MONTH YEAR GSTR1!');
+console.log('GST Report Generator Web Version - ' + new Date().toISOString());
 
 class GSTReportGenerator {
     constructor() {
@@ -143,6 +141,9 @@ class GSTReportGenerator {
     }
 
     async processAmazonFiles() {
+        // Clear existing data before processing
+        this.processedData.amazon = [];
+        
         for (const file of this.amazonFiles) {
             console.log(`Processing Amazon file: ${file.name}`);
             const text = await this.readFileAsText(file);
@@ -167,6 +168,7 @@ class GSTReportGenerator {
     }
 
     async processMeeshoFiles() {
+        // Clear existing data before processing
         this.processedData.meesho = {
             tcs_sales: [],
             tcs_sales_return: [],
@@ -772,7 +774,10 @@ class GSTReportGenerator {
         console.log('Consolidating B2CS data state-wise...');
         const stateWiseData = {};
         
-        b2csArray.forEach(entry => {
+        // Create a fresh copy to avoid accumulation
+        const freshB2CSArray = JSON.parse(JSON.stringify(b2csArray));
+        
+        freshB2CSArray.forEach(entry => {
             const stateKey = entry['Place Of Supply'];
             if (!stateWiseData[stateKey]) {
                 stateWiseData[stateKey] = {
@@ -794,7 +799,7 @@ class GSTReportGenerator {
             'Taxable Value': Math.round(entry['Taxable Value'] * 100) / 100
         }));
         
-        console.log(`Consolidated ${b2csArray.length} B2CS entries into ${consolidated.length} state-wise entries`);
+        console.log(`Consolidated ${freshB2CSArray.length} B2CS entries into ${consolidated.length} state-wise entries`);
         return consolidated;
     }
     
@@ -802,7 +807,10 @@ class GSTReportGenerator {
         console.log('Consolidating HSN data by HSN code...');
         const hsnWiseData = {};
         
-        hsnArray.forEach(entry => {
+        // Create a fresh copy to avoid accumulation
+        const freshHSNArray = JSON.parse(JSON.stringify(hsnArray));
+        
+        freshHSNArray.forEach(entry => {
             const hsnKey = entry['HSN Code'];
             if (!hsnWiseData[hsnKey]) {
                 hsnWiseData[hsnKey] = {
@@ -966,10 +974,15 @@ class GSTReportGenerator {
     
     consolidateDocsData(amazonDocs, meeshoDocs) {
         console.log('Consolidating docs data...');
-        const consolidated = [...amazonDocs];
         
-        if (meeshoDocs && meeshoDocs.length > 0) {
-            consolidated.push(...meeshoDocs);
+        // Create fresh copies to avoid accumulation
+        const freshAmazonDocs = JSON.parse(JSON.stringify(amazonDocs));
+        const freshMeeshoDocs = JSON.parse(JSON.stringify(meeshoDocs));
+        
+        const consolidated = [...freshAmazonDocs];
+        
+        if (freshMeeshoDocs && freshMeeshoDocs.length > 0) {
+            consolidated.push(...freshMeeshoDocs);
         } else if (this.processedData.meesho.tax_invoice_details && this.processedData.meesho.tax_invoice_details.length > 0) {
             // Extract ALL invoice numbers from tax_invoice_details
             const allInvoices = [];
@@ -1059,7 +1072,10 @@ class GSTReportGenerator {
     consolidateSUPECOData(supecoArray) {
         console.log('Consolidating SUPECO data with tax calculations...');
         
-        return supecoArray.map(entry => {
+        // Create a fresh copy to avoid accumulation
+        const freshSUPECOArray = JSON.parse(JSON.stringify(supecoArray));
+        
+        return freshSUPECOArray.map(entry => {
             const taxableValue = entry['Taxable Value (₹)'] || 0;
             
             if (entry['Platform'] === 'Meesho') {
@@ -1142,9 +1158,13 @@ class GSTReportGenerator {
                 }
             }
             
+            // Get GSTIN from the portal input field
+            const gstinField = document.getElementById('gstin');
+            const gstin = gstinField ? gstinField.value.trim() : "27CJAPK3544E1ZH";
+            
             // Create GSTR1 JSON structure
             const gstr1Json = {
-                "gstin": "27CJAPK3544E1ZH",
+                "gstin": gstin,
                 "fp": `${monthNumber}${year}`,
                 "version": "GST3.2.2",
                 "hash": "hash"

@@ -1,4 +1,2 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
-hashlib2==1.0.1
-sqlite3

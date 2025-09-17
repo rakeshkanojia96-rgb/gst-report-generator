@@ -92,26 +92,36 @@ exports.handler = async (event, context) => {
         const method = event.httpMethod;
         const body = event.body ? JSON.parse(event.body) : {};
         
-        // Route requests
+        // Debug logging
+        console.log('Function called with:', { path, method, body });
+        
+        // Route requests - handle all auth endpoints
         if (method === 'POST') {
-            if (path.includes('/register')) {
+            if (path.includes('register') || path === '/.netlify/functions/auth') {
+                console.log('Processing registration request');
                 return await registerUser(body, headers);
-            } else if (path.includes('/login')) {
+            } else if (path.includes('login')) {
                 return await loginUser(body, headers);
-            } else if (path.includes('/logout')) {
+            } else if (path.includes('logout')) {
                 return await logoutUser(body, headers);
-            } else if (path.includes('/validate')) {
+            } else if (path.includes('validate')) {
                 return await validateSession(body, headers);
-            } else if (path.includes('/update-profile')) {
+            } else if (path.includes('update-profile')) {
                 return await updateProfile(body, headers);
-            } else if (path.includes('/change-password')) {
+            } else if (path.includes('change-password')) {
                 return await changePassword(body, headers);
             }
         } else if (method === 'GET') {
-            if (path.includes('/profile')) {
+            if (path.includes('profile')) {
                 const sessionToken = event.headers.authorization?.replace('Bearer ', '');
                 return await getProfile({ session_token: sessionToken }, headers);
             }
+        }
+        
+        // If no route matches, check if it's a general auth request
+        if (path === '/.netlify/functions/auth' && method === 'POST') {
+            // Default to registration if no specific endpoint
+            return await registerUser(body, headers);
         }
         
         return {

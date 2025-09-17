@@ -1,26 +1,26 @@
 {
-  "name": "gst-report-generator-web",
+  "name": "gst-report-generator",
   "version": "1.0.0",
-  "description": "GST Report Generator - Web Application for Indian Businesses",
-  "main": "index.html",
+  "description": "GST Report Generator for Amazon and Meesho data",
+  "main": "app.js",
   "scripts": {
-    "start": "serve -s . -l 3000",
-    "build": "echo 'Static files ready for deployment'",
-    "deploy": "echo 'Ready for web hosting'"
+    "start": "python server.py",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "GST",
-    "India",
-    "Tax",
-    "Report",
-    "Generator",
-    "Amazon",
-    "Meesho",
-    "GSTR1"
+    "gst",
+    "tax",
+    "amazon",
+    "meesho",
+    "india"
   ],
-  "author": "GST Report Generator",
-  "license": "Commercial",
-  "dependencies": {},
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "papaparse": "^5.3.0",
+    "xlsx": "^0.18.5",
+    "sqlite3": "^5.1.6"
+  },
   "devDependencies": {
     "serve": "^14.2.1"
   },

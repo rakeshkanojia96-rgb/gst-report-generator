@@ -5,7 +5,7 @@ import secrets
 import sqlite3
 from datetime import datetime, timezone, timedelta
 
-def handler(event, context):
+def lambda_handler(event, context):
     """
     Netlify serverless function for authentication
     """

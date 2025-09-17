@@ -1,16 +1,15 @@
+functionsDirectory = "/Users/rakesh/Documents/Windsurf Works GST/GSTR Reports Genarator/gst-report-generator-web/netlify/functions"
+functionsDirectoryOrigin = "config"
 headersOrigin = "config"
+redirectsOrigin = "config"
 plugins = []
-redirects = []
-
-[functions]
-
-[functions."*"]
 
 [build]
-publish = "/Users/rakesh/Documents/Windsurf Works GST/GSTR Reports Genarator/gst-report-generator-web-v1-final"
+publish = "/Users/rakesh/Documents/Windsurf Works GST/GSTR Reports Genarator/gst-report-generator-web"
 publishOrigin = "config"
 commandOrigin = "config"
-command = "echo 'Static site - no build required'"
+command = "echo 'No build command needed'"
+functions = "/Users/rakesh/Documents/Windsurf Works GST/GSTR Reports Genarator/gst-report-generator-web/netlify/functions"
 
 [build.environment]
 NODE_VERSION = "18"
@@ -26,6 +25,18 @@ NODE_VERSION = "18"
 [build.processing.js]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+Access-Control-Allow-Origin = "*"
+Access-Control-Allow-Headers = "Content-Type, Authorization"
+Access-Control-Allow-Methods = "GET, POST, OPTIONS"
 
 [[headers]]
 for = "/*"
@@ -53,3 +64,15 @@ for = "*.html"
 
 [headers.values]
 Cache-Control = "public, max-age=3600"
+
+[[redirects]]
+from = "/api/auth/*"
+to = "/.netlify/functions/auth"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]

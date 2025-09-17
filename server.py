@@ -12,7 +12,7 @@ import urllib.parse
 from pathlib import Path
 from auth_backend import AuthBackend
 
-PORT = 8082
+PORT = 8083
 
 class AuthHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):

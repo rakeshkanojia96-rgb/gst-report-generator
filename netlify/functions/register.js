@@ -1,46 +1,42 @@
-const sqlite3 = require('sqlite3');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-// Initialize database
-function initDatabase() {
+// Simple file-based storage for now (temporary solution)
+function saveUser(userData) {
     return new Promise((resolve, reject) => {
-        const dbPath = '/tmp/users.db';
-        const db = new sqlite3.Database(dbPath);
-        
-        db.serialize(() => {
-            // Create users table
-            db.run(`
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    first_name TEXT NOT NULL,
-                    last_name TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    phone TEXT,
-                    company TEXT,
-                    gst_number TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_login TIMESTAMP
-                )
-            `);
+        try {
+            const usersFile = '/tmp/users.json';
+            let users = [];
             
-            // Create sessions table
-            db.run(`
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    session_token TEXT UNIQUE NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                )
-            `, (err) => {
-                db.close();
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+            // Read existing users
+            if (fs.existsSync(usersFile)) {
+                const data = fs.readFileSync(usersFile, 'utf8');
+                users = JSON.parse(data);
+            }
+            
+            // Check if email already exists
+            if (users.find(user => user.email === userData.email)) {
+                reject(new Error('Email already exists'));
+                return;
+            }
+            
+            // Add new user
+            const newUser = {
+                id: Date.now(),
+                ...userData,
+                created_at: new Date().toISOString()
+            };
+            
+            users.push(newUser);
+            
+            // Save back to file
+            fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+            resolve(newUser);
+            
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 
@@ -87,9 +83,6 @@ exports.handler = async (event, context) => {
     }
     
     try {
-        // Initialize database
-        await initDatabase();
-        
         // Parse request body
         const data = event.body ? JSON.parse(event.body) : {};
         
@@ -109,52 +102,29 @@ exports.handler = async (event, context) => {
         
         // Hash password
         const { hash: passwordHash, salt } = hashPassword(data.password);
-        const currentTime = getISTTime().toISOString();
         
-        return new Promise((resolve, reject) => {
-            const db = new sqlite3.Database('/tmp/users.db');
-            
-            db.run(`
-                INSERT INTO users (first_name, last_name, email, phone, company, gst_number, password_hash, salt, last_login)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                data.first_name, 
-                data.last_name, 
-                data.email,
-                data.phone || '', 
-                data.company || '', 
-                data.gst_number,
-                passwordHash, 
-                salt, 
-                currentTime
-            ], function(err) {
-                db.close();
-                
-                if (err) {
-                    console.error('Registration error:', err);
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        resolve({
-                            statusCode: 400,
-                            headers,
-                            body: JSON.stringify({ success: false, message: 'Email already exists' })
-                        });
-                    } else {
-                        resolve({
-                            statusCode: 500,
-                            headers,
-                            body: JSON.stringify({ success: false, message: `Registration failed: ${err.message}` })
-                        });
-                    }
-                } else {
-                    console.log('User registered successfully:', data.email);
-                    resolve({
-                        statusCode: 200,
-                        headers,
-                        body: JSON.stringify({ success: true, message: 'User registered successfully' })
-                    });
-                }
-            });
-        });
+        // Prepare user data
+        const userData = {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            email: data.email,
+            phone: data.phone || '',
+            company: data.company || '',
+            gst_number: data.gst_number,
+            password_hash: passwordHash,
+            salt: salt,
+            last_login: getISTTime().toISOString()
+        };
+        
+        // Save user
+        await saveUser(userData);
+        
+        console.log('User registered successfully:', data.email);
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ success: true, message: 'User registered successfully' })
+        };
         
     } catch (error) {
         console.error('Registration function error:', error);

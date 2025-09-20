@@ -136,6 +136,17 @@ exports.handler = async (event, context) => {
         
         // Find user
         const user = findUser(data.email);
+        console.log('User found:', user ? 'Yes' : 'No');
+        if (user) {
+            console.log('User data structure:', {
+                email: user.email,
+                hasPasswordHash: !!user.password_hash,
+                hasSalt: !!user.salt,
+                passwordHashLength: user.password_hash ? user.password_hash.length : 0,
+                saltLength: user.salt ? user.salt.length : 0
+            });
+        }
+        
         if (!user) {
             return {
                 statusCode: 401,
@@ -146,6 +157,13 @@ exports.handler = async (event, context) => {
         
         // Verify password
         const hashedPassword = hashPassword(data.password, user.salt);
+        console.log('Password verification:', {
+            provided: hashedPassword,
+            stored: user.password_hash,
+            salt: user.salt,
+            match: hashedPassword === user.password_hash
+        });
+        
         if (hashedPassword !== user.password_hash) {
             return {
                 statusCode: 401,

@@ -78,6 +78,18 @@ force = false
 [redirects.headers]
 
 [[redirects]]
+from = "/api/auth/login"
+to = "/.netlify/functions/login"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
 from = "/api/auth/*"
 to = "/.netlify/functions/auth"
 status = 200.0

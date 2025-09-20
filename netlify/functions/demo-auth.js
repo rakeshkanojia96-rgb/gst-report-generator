@@ -61,6 +61,7 @@ exports.handler = async (event, context) => {
         const data = event.body ? JSON.parse(event.body) : {};
         
         console.log('Demo auth called:', { path, method, email: data.email });
+        console.log('Available demo users:', DEMO_USERS.map(u => ({ email: u.email, password: u.password_hash })));
         
         // Handle registration
         if (method === 'POST' && (path.includes('register') || path.includes('demo-auth'))) {
@@ -114,8 +115,8 @@ exports.handler = async (event, context) => {
             };
         }
         
-        // Handle login
-        if (method === 'POST' && path.includes('login')) {
+        // Handle login - check for both login path and general demo-auth path
+        if (method === 'POST' && (path.includes('login') || (!path.includes('register') && data.email && data.password))) {
             if (!data.email || !data.password) {
                 return {
                     statusCode: 400,

@@ -9,7 +9,7 @@ const DEMO_USERS = [
         email: 'rakesh@gmail.com',
         phone: '9898766432',
         company: 'rakesh ltd',
-        gst_number: '27CJAPK3544E1ZH',
+        gst_number: '27CJAPK3544E1ZI',
         password_hash: 'demo_hash_123',
         salt: 'demo_salt_123',
         created_at: new Date().toISOString(),
@@ -136,13 +136,9 @@ exports.handler = async (event, context) => {
                 };
             }
             
-            // For demo purposes, accept any password for existing users
-            // In production, you'd verify the password hash
-            const hashedPassword = hashPassword(data.password, user.salt);
-            if (hashedPassword.hash !== user.password_hash) {
-                // For demo, let's be more lenient
-                console.log('Password mismatch, but allowing for demo');
-            }
+            // For demo purposes, accept any password for existing demo users
+            // In production, you'd verify the password hash properly
+            console.log('Demo login - accepting any password for user:', user.email);
             
             // Generate session token
             const sessionToken = generateSessionToken();

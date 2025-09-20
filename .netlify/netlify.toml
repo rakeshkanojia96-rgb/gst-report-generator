@@ -67,7 +67,7 @@ Cache-Control = "public, max-age=3600"
 
 [[redirects]]
 from = "/api/auth/register"
-to = "/.netlify/functions/register"
+to = "/.netlify/functions/demo-auth"
 status = 200.0
 force = false
 
@@ -79,7 +79,7 @@ force = false
 
 [[redirects]]
 from = "/api/auth/login"
-to = "/.netlify/functions/login"
+to = "/.netlify/functions/demo-auth"
 status = 200.0
 force = false
 
@@ -91,7 +91,7 @@ force = false
 
 [[redirects]]
 from = "/api/auth/*"
-to = "/.netlify/functions/auth"
+to = "/.netlify/functions/demo-auth"
 status = 200.0
 force = false
 

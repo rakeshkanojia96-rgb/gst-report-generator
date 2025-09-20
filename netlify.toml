@@ -10,17 +10,17 @@
 
 [[redirects]]
   from = "/api/auth/register"
-  to = "/.netlify/functions/demo-auth"
+  to = "/.netlify/functions/simple-auth"
   status = 200
 
 [[redirects]]
   from = "/api/auth/login"
-  to = "/.netlify/functions/demo-auth"
+  to = "/.netlify/functions/simple-auth"
   status = 200
 
 [[redirects]]
   from = "/api/auth/*"
-  to = "/.netlify/functions/demo-auth"
+  to = "/.netlify/functions/simple-auth"
   status = 200
 
 [[headers]]

@@ -2,19 +2,13 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-// Simple file-based storage for now (temporary solution)
+// Simple in-memory storage for demo (not persistent across function calls)
+// In a real production environment, you'd use a database like FaunaDB, Supabase, or Airtable
+let users = [];
+
 function saveUser(userData) {
     return new Promise((resolve, reject) => {
         try {
-            const usersFile = '/tmp/users.json';
-            let users = [];
-            
-            // Read existing users
-            if (fs.existsSync(usersFile)) {
-                const data = fs.readFileSync(usersFile, 'utf8');
-                users = JSON.parse(data);
-            }
-            
             // Check if email already exists
             if (users.find(user => user.email === userData.email)) {
                 reject(new Error('Email already exists'));
@@ -29,9 +23,9 @@ function saveUser(userData) {
             };
             
             users.push(newUser);
+            console.log('User saved to memory:', newUser.email);
+            console.log('Total users in memory:', users.length);
             
-            // Save back to file
-            fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
             resolve(newUser);
             
         } catch (error) {

@@ -10,7 +10,7 @@ const DEMO_USERS = [
         phone: '9898766432',
         company: 'rakesh ltd',
         gst_number: '27CJAPK3544E1ZI',
-        password_hash: 'demo_hash_123',
+        password_hash: 'YasYah@1',
         salt: 'demo_salt_123',
         created_at: new Date().toISOString(),
         last_login: new Date().toISOString()
@@ -136,9 +136,22 @@ exports.handler = async (event, context) => {
                 };
             }
             
-            // For demo purposes, accept any password for existing demo users
-            // In production, you'd verify the password hash properly
-            console.log('Demo login - accepting any password for user:', user.email);
+            // For demo purposes, check if password matches the stored password directly
+            // In production, you'd use proper password hashing
+            console.log('Checking password for user:', user.email);
+            console.log('Provided password:', data.password);
+            console.log('Stored password:', user.password_hash);
+            
+            if (data.password !== user.password_hash) {
+                console.log('Password mismatch');
+                return {
+                    statusCode: 401,
+                    headers,
+                    body: JSON.stringify({ success: false, message: 'Invalid credentials' })
+                };
+            }
+            
+            console.log('Password match - login successful');
             
             // Generate session token
             const sessionToken = generateSessionToken();

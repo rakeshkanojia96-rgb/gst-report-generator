@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GST Report Generator - India's #1 Tax Compliance Tool</title>
+    <meta name="description" content="Generate GST-compliant reports from Amazon and Meesho data. Perfect for Indian businesses and e-commerce sellers.">
+    <meta name="keywords" content="GST, India, Tax, GSTR1, Amazon, Meesho, Report Generator, E-commerce, Tax Compliance">
+    <meta property="og:title" content="GST Report Generator - India's #1 Tax Compliance Tool">
+    <meta property="og:description" content="Generate GST-compliant reports from Amazon and Meesho data instantly.">
+    <meta property="og:type" content="website">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9ff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+        .feature-card {
+            transition: transform 0.2s;
+        }
+        .feature-card:hover {
+            transform: translateY(-2px);
+        }
+        .file-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 5px 0;
+        }
+        .progress-container {
+            margin: 20px 0;
+        }
+        .results-container {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-12 text-center mb-5">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h1 class="display-4 text-primary">GST Report Generator</h1>
+                        <p class="lead">India's #1 Tool for GST-compliant reports from Amazon and Meesho data</p>
+                    </div>
+                    <div class="auth-section">
+                        <button class="btn btn-outline-primary me-2" id="loginBtn" data-bs-toggle="modal" data-bs-target="#authModal">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                        <div id="userProfileSection" class="d-none">
+                            <div class="dropdown">
+                                <button class="btn btn-outline-success dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user-circle"></i> <span id="userDisplayName">User</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                    <li><a class="dropdown-item" href="#" id="viewProfile"><i class="fas fa-user"></i> Profile</a></li>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-cog"></i> Settings</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" onclick="authSystem.handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-success" role="alert">
+                    <i class="fas fa-shield-alt"></i> <strong>Trusted by 1000+ Indian Businesses</strong> - Generate accurate GSTR1 reports in minutes
+                </div>
+            </div>
+        </div>
+        <!-- Configuration Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-file-invoice-dollar"></i> GST Filing Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="gstin" class="form-label">GSTIN</label>
+                                <input type="text" class="form-control" id="gstin" value="27CJAPK3544E1ZH" placeholder="Enter GSTIN">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="period" class="form-label">Filing Period</label>
+                                <input type="month" class="form-control" id="period" value="2025-06">
+                            </div>
+                            <div class="col-md-4">
+                                <!-- Reserved space for future configuration field -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card feature-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5><i class="fab fa-amazon"></i> Amazon MTR Report</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="amazonUpload">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h5>Drop Amazon CSV files here</h5>
+                            <p class="text-muted">e.g., MTR_B2C-JULY-2025.csv or click to browse</p>
+                            <input type="file" id="amazonFiles" multiple accept=".csv" style="display: none;">
+                        </div>
+                        <div id="amazonFileList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card feature-card">
+                    <div class="card-header bg-success text-white">
+                        <h5><i class="fas fa-shopping-cart"></i> Meesho Reports</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="meeshoUpload">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-success mb-3"></i>
+                            <h5>Drop Meesho Excel/CSV files here</h5>
+                            <p class="text-muted">TCS Sales, TCS Returns, Tax Invoice Details</p>
+                            <input type="file" id="meeshoFiles" multiple accept=".xlsx,.csv" style="display: none;">
+                        </div>
+                        <div id="meeshoFileList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Button -->
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <button class="btn btn-lg btn-primary" id="processBtn">
+                    <i class="fas fa-cogs"></i> Generate GST Reports
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressSection" class="progress-container" style="display: none;">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Processing Reports...</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="progressText">Initializing...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="results-container" style="display: none;">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mt-3">
+                        <div id="reportSummary"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3 class="text-center mb-4">Features</h3>
+            </div>
+            <div class="col-md-4">
+                <div class="card feature-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-file-upload fa-3x text-primary mb-3"></i>
+                        <h5>Multi-Platform Support</h5>
+                        <p>Upload reports from Amazon MTR and Meesho platforms simultaneously</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card feature-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5>GST Portal Compatible</h5>
+                        <p>Generated JSON files are fully compatible with GST portal offline upload</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card feature-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                        <h5>Detailed Analytics</h5>
+                        <p>Comprehensive Excel reports with state-wise breakdowns and summaries</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="row mt-5 mb-5">
+        <div class="col-12">
+            <h3 class="text-center mb-4">Simple Pricing for Indian Businesses</h3>
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white text-center">
+                            <h4>Professional Plan</h4>
+                            <h2>₹999 <small class="text-light">/month</small></h2>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> Unlimited Amazon & Meesho Reports</li>
+                                <li><i class="fas fa-check text-success"></i> GSTR1 JSON Generation</li>
+                                <li><i class="fas fa-check text-success"></i> Excel Reports with 9 Sheets</li>
+                                <li><i class="fas fa-check text-success"></i> GST Portal Compatible</li>
+                                <li><i class="fas fa-check text-success"></i> Email Support</li>
+                                <li><i class="fas fa-check text-success"></i> Secure Data Processing</li>
+                            </ul>
+                            <div class="text-center">
+                                <button class="btn btn-primary btn-lg">Start Free Trial</button>
+                                <p class="small text-muted mt-2">No credit card required</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-5 py-4 bg-dark text-white text-center">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>GST Report Generator</h5>
+                    <p>India's most trusted GST compliance tool for e-commerce businesses.</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Contact</h5>
+                    <p>Email: support@gstreportgenerator.in<br>
+                    Phone: +91-XXXX-XXXXXX</p>
+                </div>
+            </div>
+            <hr>
+            <p>&copy; 2025 GST Report Generator. Built for seamless ecommerce tax compliance in India.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <!-- Initialize Firebase (provides window.firebaseServices) -->
+    <script type="module" src="firebase-init.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js?cachebust=444444"></script>
+</body>
+</html>

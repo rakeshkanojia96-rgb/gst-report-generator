@@ -10,11 +10,439 @@ class AuthSystem {
         this.initializeAuth();
     }
 
+    // Settings: Theme + Email notifications
+    bindSettings() {
+        // Open modal
+        document.getElementById('openSettings')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            // load current prefs
+            const prefs = this.loadPrefs();
+            const themeToggle = document.getElementById('themeToggle');
+            const emailToggle = document.getElementById('emailNotifToggle');
+            if (themeToggle) themeToggle.checked = (prefs.theme === 'dark');
+            if (emailToggle) emailToggle.checked = !!prefs.email_notifications;
+            const m = new bootstrap.Modal(document.getElementById('settingsModal'));
+            m.show();
+        });
+
+        // Save
+        document.getElementById('saveSettingsBtn')?.addEventListener('click', async () => {
+            const themeToggle = document.getElementById('themeToggle');
+            const emailToggle = document.getElementById('emailNotifToggle');
+            const prefs = {
+                theme: themeToggle?.checked ? 'dark' : 'light',
+                email_notifications: !!emailToggle?.checked
+            };
+            this.applyTheme(prefs.theme);
+            this.savePrefs(prefs);
+            // persist to Firestore when logged in
+            if (this.firebase && this.currentUser?.uid) {
+                try {
+                    const { db, doc, updateDoc } = this.firebase;
+                    await updateDoc(doc(db, 'users', this.currentUser.uid), { preferences: prefs });
+                } catch (e) { console.warn('Failed to persist preferences', e); }
+            }
+            const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+            if (modal) modal.hide();
+            this.showSuccessMessage('Settings saved');
+        });
+
+        // Apply theme from saved prefs on startup
+        const existing = this.loadPrefs();
+        this.applyTheme(existing.theme || 'light');
+    }
+
+    loadPrefs() {
+        try {
+            const raw = localStorage.getItem('gst_prefs');
+            return raw ? JSON.parse(raw) : {};
+        } catch { return {}; }
+    }
+
+    savePrefs(p) {
+        try { localStorage.setItem('gst_prefs', JSON.stringify(p)); } catch {}
+    }
+
+    applyTheme(theme) {
+        const body = document.body;
+        if (!body) return;
+        body.classList.remove('theme-light', 'theme-dark', 'bg-dark', 'text-white');
+        if (theme === 'dark') {
+            body.classList.add('theme-dark', 'bg-dark', 'text-white');
+            // Let CSS control readonly GSTIN styles in dark mode
+            const gstin = document.getElementById('gstin');
+            if (gstin && gstin.readOnly) {
+                gstin.style.backgroundColor = '';
+                gstin.style.color = '';
+                gstin.style.cursor = 'not-allowed';
+            }
+        } else {
+            body.classList.add('theme-light');
+            // Keep a subtle light readonly appearance in light mode
+            const gstin = document.getElementById('gstin');
+            if (gstin && gstin.readOnly) {
+                gstin.style.backgroundColor = '#f8f9fa';
+                gstin.style.color = '';
+                gstin.style.cursor = 'not-allowed';
+            }
+        }
+    }
+
+    // Trial utilities
+    updateTrialUI() {
+        try {
+            const banner = document.getElementById('trialStatusBanner');
+            const processBtn = document.getElementById('processBtn');
+            const amazonUpload = document.getElementById('amazonUpload');
+            const meeshoUpload = document.getElementById('meeshoUpload');
+            const startTrialBtn = document.getElementById('startTrialBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const trialCtaNote = document.getElementById('trialCtaNote');
+            if (!banner) return;
+
+            const now = Date.now();
+            // If subscribed and still valid, show subscription status and enable everything
+            if (this.currentUser?.subscription_status === 'active' && Number(this.currentUser.subscription_until || 0) > now) {
+                const until = new Date(Number(this.currentUser.subscription_until));
+                banner.className = 'alert alert-success';
+                banner.innerHTML = `<i class="fas fa-check-circle"></i> Subscription active until ${until.toLocaleDateString()}. Thank you!`;
+                if (processBtn) processBtn.disabled = false;
+                if (amazonUpload) amazonUpload.style.pointerEvents = '';
+                if (meeshoUpload) meeshoUpload.style.pointerEvents = '';
+                if (startTrialBtn) startTrialBtn.classList.add('d-none');
+                if (subscribeBtn) subscribeBtn.classList.add('d-none');
+                if (trialCtaNote) trialCtaNote.classList.add('d-none');
+                return;
+            }
+
+            const end = this.currentUser?.trial_end ? Number(this.currentUser.trial_end) : null;
+            if (!end) {
+                banner.className = 'alert alert-info';
+                banner.innerHTML = '<strong>Free trial</strong>: Start your 15-day trial — click "Start Free Trial" below.';
+                if (startTrialBtn) startTrialBtn.classList.remove('d-none');
+                if (subscribeBtn) subscribeBtn.classList.add('d-none');
+                if (trialCtaNote) trialCtaNote.classList.remove('d-none');
+                // Gate features until trial starts or subscription becomes active
+                if (processBtn) processBtn.disabled = true;
+                if (amazonUpload) amazonUpload.style.pointerEvents = 'none';
+                if (meeshoUpload) meeshoUpload.style.pointerEvents = 'none';
+                return;
+            }
+            const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+            if (end > now) {
+                banner.className = 'alert alert-success';
+                banner.innerHTML = `<i class="fas fa-gift"></i> Free trial active — ${daysLeft} day(s) left. <a href="#" id="bannerSubscribeLink" class="alert-link">Subscribe now</a>.`;
+                if (processBtn) processBtn.disabled = false;
+                if (amazonUpload) amazonUpload.classList.remove('disabled');
+                if (meeshoUpload) meeshoUpload.classList.remove('disabled');
+                if (startTrialBtn) startTrialBtn.classList.add('d-none');
+                if (subscribeBtn) subscribeBtn.classList.remove('d-none');
+                if (trialCtaNote) trialCtaNote.classList.add('d-none');
+            } else {
+                banner.className = 'alert alert-danger';
+                banner.innerHTML = `Your free trial has expired. <a href="#" id="bannerSubscribeLink" class="alert-link">Subscribe now</a> to continue using the service.`;
+                if (processBtn) processBtn.disabled = true;
+                if (amazonUpload) amazonUpload.style.pointerEvents = 'none';
+                if (meeshoUpload) meeshoUpload.style.pointerEvents = 'none';
+                if (startTrialBtn) startTrialBtn.classList.add('d-none');
+                if (subscribeBtn) subscribeBtn.classList.remove('d-none');
+                if (trialCtaNote) trialCtaNote.classList.add('d-none');
+            }
+            // Wire banner subscribe link and button to modal
+            const link = document.getElementById('bannerSubscribeLink');
+            if (link) link.onclick = (e) => { e.preventDefault(); new bootstrap.Modal(document.getElementById('subscribeModal')).show(); };
+            if (subscribeBtn) subscribeBtn.onclick = () => new bootstrap.Modal(document.getElementById('subscribeModal')).show();
+        } catch (e) {
+            console.warn('updateTrialUI error', e);
+        }
+    }
+
+    bindRazorpay() {
+        const payBtn = document.getElementById('payNowBtn');
+        if (!payBtn) return;
+        payBtn.onclick = async () => {
+            const keyId = (typeof RAZORPAY !== 'undefined' && RAZORPAY.KEY_ID) || (window.RAZORPAY && window.RAZORPAY.KEY_ID);
+            if (!keyId) {
+                this.showErrorMessage('Razorpay Key ID not configured');
+                return;
+            }
+            const amountPaise = 1200 * 100; // ₹1200
+            // 1) Create order on backend
+            let orderId = null;
+            try {
+                const res = await fetch((window.API_BASE || '') + '/api/payments/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: amountPaise, currency: 'INR', receipt: 'yearly_plan' })
+                });
+                const data = await res.json();
+                if (!res.ok || !data || !data.id) throw new Error(data?.message || 'Could not create order');
+                orderId = data.id;
+            } catch (e) {
+                this.showErrorMessage('Failed to create payment order: ' + (e?.message || e));
+                return;
+            }
+
+            const options = {
+                key: keyId,
+                amount: amountPaise,
+                currency: 'INR',
+                name: 'GST Report Generator',
+                description: 'Yearly Subscription',
+                order_id: orderId,
+                handler: async (response) => {
+                    try {
+                        // 2) Verify signature on backend first
+                        const verifyRes = await fetch((window.API_BASE || '') + '/api/payments/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (!verifyData?.verified) {
+                            this.showErrorMessage('Payment could not be verified. Please contact support.');
+                            return;
+                        }
+                        // 3) Mark subscription active locally and in Firestore
+                        const now = Date.now();
+                        const until = now + 365 * 24 * 60 * 60 * 1000;
+                        this.currentUser.subscription_status = 'active';
+                        this.currentUser.subscription_plan = 'yearly';
+                        this.currentUser.subscription_until = until;
+                        localStorage.setItem('gst_user_session', JSON.stringify(this.currentUser));
+                        if (this.firebase && this.currentUser.uid) {
+                            try {
+                                const { db, doc, updateDoc } = this.firebase;
+                                await updateDoc(doc(db, 'users', this.currentUser.uid), {
+                                    subscription_status: 'active',
+                                    subscription_plan: 'yearly',
+                                    subscription_until: until,
+                                    last_payment_id: response.razorpay_payment_id || null
+                                });
+                            } catch (e) { console.warn('Persist subscription failed', e); }
+                        }
+                        this.updateTrialUI();
+                        this.showSuccessMessage('Payment successful. Subscription activated.');
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('subscribeModal'));
+                        if (modal) modal.hide();
+                    } catch (e) {
+                        this.showErrorMessage('Failed to activate subscription: ' + (e?.message || e));
+                    }
+                },
+                prefill: {
+                    name: `${this.currentUser?.first_name || ''} ${this.currentUser?.last_name || ''}`.trim() || undefined,
+                    email: this.currentUser?.email || undefined,
+                    contact: this.currentUser?.phone || undefined
+                },
+                notes: {
+                    user_email: this.currentUser?.email || '',
+                    plan: 'yearly'
+                },
+                theme: { color: '#0d6efd' }
+            };
+            try {
+                const rzp = new window.Razorpay(options);
+                rzp.open();
+            } catch (e) {
+                this.showErrorMessage('Unable to open payment window: ' + (e?.message || e));
+            }
+        };
+    }
+
+    async handleAvatarRemove() {
+        // Clear local state and persisted session; keep Cloudinary asset (no credentials to delete)
+        this.currentUser.photoURL = '';
+        try {
+            localStorage.setItem('gst_user_session', JSON.stringify(this.currentUser));
+            if (this.currentUser?.email) {
+                localStorage.removeItem(`gst_photo_by_email:${this.currentUser.email}`);
+            }
+        } catch {}
+        this.populateProfileData();
+        this.showSuccessMessage('Profile photo removed');
+    }
+
+    async savePhotoURL(photoURL) {
+        const sessionToken = localStorage.getItem('gst_session_token');
+        // Attempt 1: JSON PUT to existing profile endpoint
+        try {
+            const putResp = await fetch((window.API_BASE || '') + '/api/auth/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
+                },
+                body: JSON.stringify({ photoURL })
+            });
+            if (putResp.ok) return this.persistPhotoURLLocally(photoURL);
+            if (putResp.status !== 415 && putResp.status !== 405 && putResp.status !== 501) {
+                // if other error, surface json if available
+                try { const d = await putResp.json(); console.warn('PUT profile response', d); } catch {}
+            }
+        } catch (e) { /* swallow and try fallback */ }
+
+        // Attempt 2: multipart/form-data POST fallback
+        try {
+            const fd = new FormData();
+            fd.append('photoURL', photoURL);
+            const postResp = await fetch((window.API_BASE || '') + '/api/auth/profile', {
+                method: 'POST',
+                headers: {
+                    ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
+                },
+                body: fd
+            });
+            if (postResp.ok) return this.persistPhotoURLLocally(photoURL);
+        } catch (e) {
+            // ignore
+        }
+        // Final fallback: persist locally so avatar survives reloads
+        return this.persistPhotoURLLocally(photoURL);
+    }
+
+    persistPhotoURLLocally(photoURL) {
+        try {
+            this.currentUser = { ...this.currentUser, photoURL };
+            localStorage.setItem('gst_user_session', JSON.stringify(this.currentUser));
+            if (this.currentUser?.email) {
+                localStorage.setItem(`gst_photo_by_email:${this.currentUser.email}`, photoURL);
+            }
+            return true;
+        } catch (_) { return false; }
+    }
+
+    bindProfilePhotoEvents() {
+        const changeBtn = document.getElementById('changePhotoBtn');
+        const avatar = document.getElementById('profileAvatar');
+        const input = document.getElementById('profilePhotoInput');
+        const removeBtn = document.getElementById('removePhotoBtn');
+
+        if (changeBtn && input) {
+            changeBtn.onclick = () => input.click();
+        }
+        if (avatar && input) {
+            avatar.onclick = () => input.click();
+        }
+        if (input) {
+            input.onchange = async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                try {
+                    // simple progress: disable controls during upload
+                    if (changeBtn) { changeBtn.disabled = true; changeBtn.textContent = 'Uploading...'; }
+                    if (removeBtn) removeBtn.disabled = true;
+                    await this.handleAvatarUpload(file);
+                } finally {
+                    if (changeBtn) { changeBtn.disabled = false; changeBtn.textContent = 'Change Photo'; }
+                    if (removeBtn) removeBtn.disabled = false;
+                }
+                // reset input to allow same file re-upload
+                e.target.value = '';
+            };
+        }
+        if (removeBtn) {
+            removeBtn.onclick = async () => {
+                await this.handleAvatarRemove();
+            };
+        }
+    }
+
+    async handleAvatarUpload(file) {
+        try {
+            if (file.size > 2 * 1024 * 1024) {
+                this.showErrorMessage('Image must be under 2MB');
+                return;
+            }
+            const allowed = ['image/png','image/jpeg','image/jpg','image/webp'];
+            if (!allowed.includes(file.type)) {
+                this.showErrorMessage('Only PNG, JPG, or WebP images are allowed');
+                return;
+            }
+
+            // Cloudinary unsigned upload
+            const cloud = window?.CLOUDINARY || (window?.AppEnv && window.AppEnv.CLOUDINARY);
+            const localEnv = (typeof CLOUDINARY !== 'undefined') ? CLOUDINARY : null;
+            const CLOUD_NAME = localEnv?.CLOUD_NAME || cloud?.CLOUD_NAME;
+            const UPLOAD_PRESET = localEnv?.UPLOAD_PRESET || cloud?.UPLOAD_PRESET;
+            const FOLDER = localEnv?.FOLDER || cloud?.FOLDER || 'gst-report-generator/avatars';
+            if (!CLOUD_NAME || !UPLOAD_PRESET) {
+                this.showErrorMessage('Cloudinary is not configured');
+                return;
+            }
+
+            const form = new FormData();
+            form.append('file', file);
+            form.append('upload_preset', UPLOAD_PRESET);
+            form.append('folder', FOLDER);
+
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+                method: 'POST',
+                body: form
+            });
+            if (!res.ok) throw new Error('Upload failed');
+            const data = await res.json();
+            const photoURL = data.secure_url;
+
+            // Persist in backend profile (best-effort)
+            try {
+                await this.savePhotoURL(photoURL);
+            } catch (e) { console.warn('Backend savePhotoURL failed', e); }
+
+            // Update local UI
+            this.currentUser.photoURL = photoURL;
+            this.populateProfileData();
+            this.showSuccessMessage('Profile photo updated');
+        } catch (err) {
+            this.showErrorMessage('Failed to upload photo: ' + err.message);
+        }
+    }
+
     initializeAuth() {
         // Check for existing session
         this.checkExistingSession();
         this.setupAuthUI();
         this.bindAuthEvents();
+        this.bindProfilePhotoEvents();
+        this.bindRazorpay();
+        this.bindSettings();
+        // Start Free Trial button opens signup with trial note
+        document.getElementById('startTrialBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const modal = new bootstrap.Modal(document.getElementById('authModal'));
+            modal.show();
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('signupForm').style.display = 'block';
+            document.getElementById('trialNote')?.classList.remove('d-none');
+            document.getElementById('authModalTitle').textContent = 'Create Account — 15-day Free Trial';
+        });
+        // Top-right Login button should always show Login form first
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                try {
+                    const modalEl = document.getElementById('authModal');
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    document.getElementById('signupForm').style.display = 'none';
+                    document.getElementById('loginForm').style.display = 'block';
+                    document.getElementById('trialNote')?.classList.add('d-none');
+                    document.getElementById('authModalTitle').textContent = 'Login to GST Generator';
+                    modal.show();
+                } catch(_) {}
+            });
+        }
+        // Ensure we have a Firebase auth user (anonymous is fine for Storage)
+        try {
+            if (this.firebase && this.firebase.signInAnonymously) {
+                const { auth, signInAnonymously } = this.firebase;
+                if (!auth.currentUser) {
+                    signInAnonymously(auth).catch(() => {});
+                }
+            }
+        } catch (_) {}
         
         // Show login-first flow
         this.showLoginFirstFlow();
@@ -41,10 +469,34 @@ class AuthSystem {
         if (!this.firebase) return false;
         try {
             const { db, doc, setDoc, serverTimestamp } = this.firebase;
-            await setDoc(doc(db, 'users', uid), { ...profile, created_at: serverTimestamp() });
+            await setDoc(doc(db, 'users', uid), { 
+                ...profile, 
+                created_at: serverTimestamp(),
+                // trial & subscription fields start undefined and are added later
+                trial_start: null,
+                trial_end: null,
+                subscription_status: 'none',
+                subscription_plan: null,
+                subscription_until: null
+            });
             return true;
         } catch (e) {
             console.error('Firestore set profile error:', e);
+            return false;
+        }
+    }
+
+    async persistTrialToFirestore(uid, startMs, endMs) {
+        if (!this.firebase) return false;
+        try {
+            const { db, doc, updateDoc } = this.firebase;
+            await updateDoc(doc(db, 'users', uid), {
+                trial_start: startMs,
+                trial_end: endMs
+            });
+            return true;
+        } catch (e) {
+            console.warn('Could not persist trial to Firestore:', e?.message || e);
             return false;
         }
     }
@@ -100,6 +552,9 @@ class AuthSystem {
                             <!-- Signup Form -->
                             <div id="signupForm" class="auth-form" style="display: none;">
                                 <form id="signupFormElement">
+                                    <div class="alert alert-info small" id="trialNote">
+                                        Enjoy a 15-day free trial. After that, you’ll need a subscription to continue.
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="signupFirstName" class="form-label">First Name</label>
@@ -148,7 +603,8 @@ class AuthSystem {
                                     <div class="mb-3 form-check">
                                         <input type="checkbox" class="form-check-input" id="agreeTerms" required>
                                         <label class="form-check-label" for="agreeTerms">
-                                            I agree to the Terms of Service and Privacy Policy
+                                            I agree to the <a href="./terms.html" target="_blank" rel="noopener">Terms of Service</a> and 
+                                            <a href="./privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
                                         </label>
                                     </div>
                                     <button type="submit" class="btn btn-success w-100">Create Account</button>
@@ -190,8 +646,13 @@ class AuthSystem {
                             <div id="profileView">
                                 <div class="row mb-4">
                                     <div class="col-md-3 text-center">
-                                        <div class="profile-avatar">
+                                        <div class="profile-avatar mb-2" id="profileAvatar" style="cursor: pointer;">
                                             <i class="fas fa-user-circle fa-5x text-primary"></i>
+                                        </div>
+                                        <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" />
+                                        <div class="d-flex gap-2 justify-content-center">
+                                            <button type="button" id="changePhotoBtn" class="btn btn-sm btn-outline-primary">Change Photo</button>
+                                            <button type="button" id="removePhotoBtn" class="btn btn-sm btn-outline-danger">Remove</button>
                                         </div>
                                     </div>
                                     <div class="col-md-9">
@@ -296,9 +757,16 @@ class AuthSystem {
                                         <label for="editCompany" class="form-label">Company Name</label>
                                         <input type="text" class="form-control" id="editCompany" required>
                                     </div>
+                                    
                                     <div class="mb-3">
                                         <label for="editGST" class="form-label">GST Number</label>
-                                        <input type="text" class="form-control" id="editGST" placeholder="e.g., 27AACCF6368D1CX" readonly>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="editGST" placeholder="e.g., 27AACCF6368D1CX" readonly>
+                                            <span class="input-group-text" id="editGSTLock" title="Locked">
+                                                <i class="fas fa-lock"></i>
+                                            </span>
+                                        </div>
+                                        <div class="form-text">Locked to your account. Contact support to update.</div>
                                     </div>
                                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                         <button type="button" class="btn btn-secondary me-md-2" onclick="authSystem.showProfileView()">Cancel</button>
@@ -443,7 +911,8 @@ class AuthSystem {
     showSignupForm() {
         document.getElementById('loginForm').style.display = 'none';
         document.getElementById('signupForm').style.display = 'block';
-        document.getElementById('authModalTitle').textContent = 'Create Account';
+        document.getElementById('trialNote')?.classList.remove('d-none');
+        document.getElementById('authModalTitle').textContent = 'Create Account — 15-day Free Trial';
     }
 
     validateGSTNumber(input) {
@@ -486,6 +955,33 @@ class AuthSystem {
             
             if (response.success) {
                 this.currentUser = response.user;
+                // Merge locally saved avatar by email (survives server not persisting photoURL)
+                try {
+                    if (this.currentUser?.email) {
+                        const localPhoto = localStorage.getItem(`gst_photo_by_email:${this.currentUser.email}`);
+                        if (localPhoto) this.currentUser.photoURL = localPhoto;
+                        // Merge trial info by email
+                        const trialMap = localStorage.getItem(`gst_trial_by_email:${this.currentUser.email}`);
+                        if (trialMap) {
+                            const t = JSON.parse(trialMap);
+                            this.currentUser.trial_start = t.trial_start;
+                            this.currentUser.trial_end = t.trial_end;
+                        } else {
+                            // If user has no trial stored locally, start one-time trial now
+                            if (!this.currentUser.trial_end) {
+                                const now = Date.now();
+                                const end = now + 15 * 24 * 60 * 60 * 1000;
+                                this.currentUser.trial_start = now;
+                                this.currentUser.trial_end = end;
+                                localStorage.setItem(`gst_trial_by_email:${this.currentUser.email}`, JSON.stringify({ trial_start: now, trial_end: end }));
+                                // Persist trial to Firestore so it follows user across devices
+                                if (this.firebase && this.currentUser.uid) {
+                                    this.persistTrialToFirestore(this.currentUser.uid, now, end);
+                                }
+                            }
+                        }
+                    }
+                } catch {}
                 this.isAuthenticated = true;
                 localStorage.setItem('gst_user_session', JSON.stringify(this.currentUser));
                 
@@ -496,6 +992,7 @@ class AuthSystem {
                 this.showGSTInterface();
                 this.closeAuthModal();
                 this.showSuccessMessage('Login successful!');
+                this.updateTrialUI();
             } else {
                 this.showErrorMessage(response.message || 'Login failed');
             }
@@ -533,14 +1030,38 @@ class AuthSystem {
 
         try {
             const response = await this.registerUser(formData);
+            console.log('Signup response:', response);
+            
             if (response.success) {
-                this.showSuccessMessage('Account created successfully! Please login.');
+                // Registration succeeded. Do NOT log the user in.
+                // Show login form with email prefilled and clear any session state.
+                this.currentUser = null;
+                this.isAuthenticated = false;
+                try { localStorage.removeItem('gst_user_session'); } catch {}
+                // Switch modal to Login with prefilled email
+                const signupEmail = document.getElementById('signupEmail');
+                const loginEmail = document.getElementById('loginEmail');
+                if (loginEmail && signupEmail) loginEmail.value = signupEmail.value.trim();
                 this.showLoginForm();
+                this.showSuccessMessage('Account created. Please log in to start your 15-day trial.');
             } else {
-                this.showErrorMessage(response.message || 'Registration failed');
+                const msg = (response.message || '').toLowerCase();
+                if (msg.includes('email-already-in-use')) {
+                    this.showErrorMessage('This email is already registered. Please log in.');
+                    // Switch to login form and prefill email
+                    document.getElementById('signupForm').style.display = 'none';
+                    document.getElementById('loginForm').style.display = 'block';
+                    const emailInput = document.getElementById('loginEmail');
+                    const signupEmail = document.getElementById('signupEmail');
+                    if (emailInput && signupEmail) emailInput.value = signupEmail.value.trim();
+                    document.getElementById('authModalTitle').textContent = 'Login to GST Generator';
+                } else {
+                    this.showErrorMessage(response.message || 'Signup failed');
+                }
             }
         } catch (error) {
-            this.showErrorMessage('Registration error: ' + error.message);
+            console.error('Signup error:', error);
+            this.showErrorMessage('Signup error: ' + error.message);
         }
     }
 
@@ -569,11 +1090,13 @@ class AuthSystem {
                 if (!profile) {
                     return { success: false, message: 'Profile not found in Firestore. Please contact support.' };
                 }
-                // Normalize Firestore Timestamp to milliseconds
-                const createdAtMs = profile.created_at && typeof profile.created_at.toDate === 'function'
-                    ? profile.created_at.toDate().getTime() : (profile.created_at || null);
-                const lastLoginMs = profile.last_login && typeof profile.last_login.toDate === 'function'
-                    ? profile.last_login.toDate().getTime() : (profile.last_login || null);
+                // Normalize time fields; tolerate either Timestamp or epoch ms
+                const toMs = (v) => (v && typeof v.toDate === 'function') ? v.toDate().getTime() : (v ?? null);
+                const createdAtMs = toMs(profile.created_at);
+                const lastLoginMs = toMs(profile.last_login);
+                const trialStartMs = toMs(profile.trial_start);
+                const trialEndMs = toMs(profile.trial_end);
+                const subUntilMs = toMs(profile.subscription_until);
 
                 const user = {
                     uid,
@@ -584,7 +1107,12 @@ class AuthSystem {
                     company: profile.company || '',
                     gst_number: profile.gst_number || '',
                     created_at: createdAtMs,
-                    last_login: lastLoginMs
+                    last_login: lastLoginMs,
+                    trial_start: trialStartMs,
+                    trial_end: trialEndMs,
+                    subscription_status: profile.subscription_status || 'none',
+                    subscription_plan: profile.subscription_plan || null,
+                    subscription_until: subUntilMs
                 };
                 // Maintain previous session token key for compatibility
                 localStorage.setItem('gst_session_token', 'firebase');
@@ -597,7 +1125,7 @@ class AuthSystem {
 
         // Fallback to existing backend
         try {
-            const response = await fetch('/api/auth/login', {
+            const response = await fetch((window.API_BASE || '') + '/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -640,7 +1168,7 @@ class AuthSystem {
 
         // Fallback to existing backend
         try {
-            const response = await fetch('/api/auth/register', {
+            const response = await fetch((window.API_BASE || '') + '/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
@@ -662,7 +1190,7 @@ class AuthSystem {
             } else {
                 const sessionToken = localStorage.getItem('gst_session_token');
                 if (sessionToken) {
-                    await fetch('/api/auth/logout', {
+                    await fetch((window.API_BASE || '') + '/api/auth/logout', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${sessionToken}`,
@@ -677,9 +1205,12 @@ class AuthSystem {
             localStorage.removeItem('gst_user_session');
             localStorage.removeItem('gst_session_token');
             this.showUnauthenticatedState();
+            this.updateTrialUI();
             this.hideGSTInterface();
             this.showAuthWelcome();
             this.showSuccessMessage('Logged out successfully');
+            // Soft refresh after a short delay to ensure full UI reset
+            setTimeout(() => { try { window.location.reload(); } catch(_) {} }, 500);
         } catch (error) {
             console.error('Logout error:', error);
             // Still clear local data even if server request fails
@@ -689,9 +1220,11 @@ class AuthSystem {
             localStorage.removeItem('gst_user_session');
             localStorage.removeItem('gst_session_token');
             this.showUnauthenticatedState();
+            this.updateTrialUI();
             this.hideGSTInterface();
             this.showAuthWelcome();
             this.showSuccessMessage('Logged out successfully');
+            setTimeout(() => { try { window.location.reload(); } catch(_) {} }, 500);
         }
     }
 
@@ -706,57 +1239,58 @@ class AuthSystem {
     }
 
     showAuthenticatedState() {
-        // Hide login button, show user profile
-        const loginBtn = document.getElementById('loginBtn');
-        const userProfileSection = document.getElementById('userProfileSection');
-        const userDisplayName = document.getElementById('userDisplayName');
-        
-        console.log('showAuthenticatedState called');
-        console.log('loginBtn element:', loginBtn);
-        console.log('userProfileSection element:', userProfileSection);
-        console.log('userDisplayName element:', userDisplayName);
-        console.log('currentUser:', this.currentUser);
-        
-        if (loginBtn) {
-            loginBtn.classList.add('d-none');
-            console.log('Login button hidden');
-        } else {
-            console.error('Login button not found!');
-        }
-        
-        if (userProfileSection) {
-            userProfileSection.classList.remove('d-none');
-            console.log('User profile section shown');
-        } else {
-            console.error('User profile section not found!');
-        }
-        
-        if (userDisplayName && this.currentUser) {
-            userDisplayName.textContent = `${this.currentUser.first_name} ${this.currentUser.last_name}`;
-            console.log('User display name updated');
-        } else {
-            console.error('User display name element not found or no current user!');
-        }
-        
-        // Auto-populate GSTIN field with user's GST number and make it readonly
-        if (this.currentUser && this.currentUser.gst_number) {
+        // Show user profile section
+        document.getElementById('userProfileSection').classList.remove('d-none');
+        document.getElementById('loginBtn').style.display = 'none';
+        // Update trial UI
+        this.updateTrialUI();
+        // Update header name and lock GSTIN
+        try {
+            const name = `${this.currentUser?.first_name || ''} ${this.currentUser?.last_name || ''}`.trim() || 'User';
+            const nameEl = document.getElementById('userDisplayName');
+            if (nameEl) nameEl.textContent = name;
             const gstinField = document.getElementById('gstin');
-            if (gstinField) {
+            if (gstinField && this.currentUser?.gst_number) {
                 gstinField.value = this.currentUser.gst_number;
                 gstinField.readOnly = true;
-                gstinField.style.backgroundColor = '#f8f9fa';
+                // Let CSS/theme control colors; just set cursor
+                gstinField.style.backgroundColor = '';
+                gstinField.style.color = '';
                 gstinField.style.cursor = 'not-allowed';
-                console.log('GSTIN field populated with:', this.currentUser.gst_number);
             }
-        }
-        
-        console.log('Authentication state updated - user profile should be visible');
+        } catch (_) {}
     }
 
     showUnauthenticatedState() {
         // Show login button, hide user profile
         document.getElementById('loginBtn')?.classList.remove('d-none');
         document.getElementById('userProfileSection')?.classList.add('d-none');
+        // Reset banner and pricing to unauthenticated state
+        try {
+            this.currentUser = null;
+            this.isAuthenticated = false;
+            const banner = document.getElementById('trialStatusBanner');
+            if (banner) {
+                banner.className = 'alert alert-info';
+                banner.innerHTML = '<strong>Free trial</strong>: Start your 15-day trial — click "Start Free Trial" below.';
+            }
+            const startTrialBtn = document.getElementById('startTrialBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            if (startTrialBtn) startTrialBtn.classList.remove('d-none');
+            if (subscribeBtn) subscribeBtn.classList.add('d-none');
+            const pricingTitle = document.getElementById('pricingTitle');
+            const pricingSubtitle = document.getElementById('pricingSubtitle');
+            const pricingPlanName = document.getElementById('pricingPlanName');
+            const pricingHeader = document.getElementById('pricingCardHeader');
+            const trialCtaNote = document.getElementById('trialCtaNote');
+            const activePlanBadge = document.getElementById('activePlanBadge');
+            if (pricingTitle) pricingTitle.textContent = 'Simple Yearly Pricing';
+            if (pricingPlanName) pricingPlanName.textContent = 'Yearly Plan — ₹1200/year';
+            if (pricingSubtitle) pricingSubtitle.innerHTML = '';
+            if (trialCtaNote) trialCtaNote.classList.remove('d-none');
+            if (pricingHeader) { pricingHeader.classList.remove('bg-success','bg-secondary'); pricingHeader.classList.add('bg-primary'); }
+            if (activePlanBadge) activePlanBadge.classList.add('d-none');
+        } catch (_) {}
     }
 
     closeAuthModal() {
@@ -953,6 +1487,15 @@ class AuthSystem {
             document.getElementById('profileEmail').textContent = this.currentUser.email;
             document.getElementById('profileFullNameDetail').textContent = 
                 `${this.currentUser.first_name} ${this.currentUser.last_name}`;
+            // Avatar
+            const avatar = document.getElementById('profileAvatar');
+            if (avatar) {
+                if (this.currentUser.photoURL) {
+                    avatar.innerHTML = `<img src="${this.currentUser.photoURL}" alt="avatar" width="96" height="96" class="rounded-circle object-fit-cover" />`;
+                } else {
+                    avatar.innerHTML = '<i class="fas fa-user-circle fa-5x text-primary"></i>';
+                }
+            }
             // Business info
             document.getElementById('profileEmailDetail').textContent = this.currentUser.email || '-';
             document.getElementById('profilePhone').textContent = this.currentUser.phone || '-';
@@ -982,6 +1525,8 @@ class AuthSystem {
         document.getElementById('profileView').style.display = 'block';
         document.getElementById('editProfileForm').style.display = 'none';
         document.getElementById('changePasswordForm').style.display = 'none';
+        // ensure avatar events are bound (DOM may be recreated only once, but safe to re-bind)
+        this.bindProfilePhotoEvents();
     }
 
     showEditProfile() {
@@ -1019,18 +1564,38 @@ class AuthSystem {
         };
 
         try {
-            const response = await this.updateUserProfile(formData);
-            
-            if (response.success) {
-                // Show user profile section
+            const file = document.getElementById('editPhoto').files?.[0];
+
+            if (this.firebase && this.currentUser?.uid) {
+                const { db, doc, updateDoc, storage, ref, uploadBytes, getDownloadURL } = this.firebase;
+
+                // If a new photo selected, upload to Storage and get URL
+                let photoURL = this.currentUser.photoURL || '';
+                if (file) {
+                    if (file.size > 2 * 1024 * 1024) {
+                        this.showErrorMessage('Image must be under 2MB');
+                        return;
+                    }
+                    const pathRef = ref(storage, `user_avatars/${this.currentUser.uid}/profile.jpg`);
+                    await uploadBytes(pathRef, file, { contentType: file.type });
+                    photoURL = await getDownloadURL(pathRef);
+                }
+
+                const updatePayload = { ...formData };
+                if (file) updatePayload.photoURL = photoURL;
+
+                await updateDoc(doc(db, 'users', this.currentUser.uid), updatePayload);
+
+                // Update local state
+                this.currentUser = { ...this.currentUser, ...updatePayload };
+
+                // Update UI
                 document.getElementById('userProfileSection').classList.remove('d-none');
-                document.getElementById('loginBtn').style.display = 'none';
-                
-                // Update display name
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) loginBtn.style.display = 'none';
                 document.getElementById('userDisplayName').textContent = 
                     `${this.currentUser.first_name} ${this.currentUser.last_name}`;
-                
-                // Auto-populate GSTIN field with user's GST number and make it readonly
+
                 if (this.currentUser.gst_number) {
                     const gstinField = document.getElementById('gstin');
                     if (gstinField) {
@@ -1040,7 +1605,21 @@ class AuthSystem {
                         gstinField.style.cursor = 'not-allowed';
                     }
                 }
-                
+
+                this.showSuccessMessage('Profile updated successfully!');
+                this.populateProfileData();
+                this.showProfileView();
+                return;
+            }
+
+            // Fallback to existing backend
+            const response = await this.updateUserProfile(formData);
+            if (response.success) {
+                document.getElementById('userProfileSection').classList.remove('d-none');
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) loginBtn.style.display = 'none';
+                document.getElementById('userDisplayName').textContent = 
+                    `${this.currentUser.first_name} ${this.currentUser.last_name}`;
                 this.showSuccessMessage('Profile updated successfully!');
                 this.populateProfileData();
                 this.showProfileView();
@@ -1089,7 +1668,7 @@ class AuthSystem {
     async updateUserProfile(profileData) {
         try {
             const sessionToken = localStorage.getItem('gst_session_token');
-            const response = await fetch('/api/auth/profile', {
+            const response = await fetch((window.API_BASE || '') + '/api/auth/profile', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1110,7 +1689,7 @@ class AuthSystem {
     async changeUserPassword(passwordData) {
         try {
             const sessionToken = localStorage.getItem('gst_session_token');
-            const response = await fetch('/api/auth/change-password', {
+            const response = await fetch((window.API_BASE || '') + '/api/auth/change-password', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

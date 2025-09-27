@@ -2,56 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Shipping — GST Report Generator</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body.theme-dark { background-color: #121212; color: #e9ecef; }
-    body.theme-dark a { color: #9ec5fe; }
-    body.theme-dark .navbar, body.theme-dark footer { background-color: #0f172a !important; }
-    body.theme-dark .card { background-color: #1f2937; color: #e9ecef; }
-  </style>
-  <script>
-    (function(){
-      try {
-        var prefs = null; try { prefs = JSON.parse(localStorage.getItem('gst_prefs')||'{}'); } catch(e){}
-        var theme = prefs?.theme || localStorage.getItem('gst_theme') || localStorage.getItem('theme');
-        if ((theme||'').toLowerCase()==='dark') { document.documentElement.classList.add('theme-dark'); document.body?.classList?.add('theme-dark'); }
-      } catch(_){}
-    })();
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shipping Policy – GST Report Generator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
-<body class="bg-light d-flex flex-column min-vh-100">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="./index.html">GST Report Generator</a>
-    </div>
-  </nav>
+<body class="bg-light">
+  <div class="container py-5">
+    <h2>Shipping Policy</h2>
+    <p class="text-muted">Last updated: 24 Sept 2025</p>
 
-  <main class="container my-5 flex-grow-1">
-    <h1 class="mb-4">Shipping Policy</h1>
-    <p class="text-muted">Last updated: <span id="lastUpdated">September 28, 2025</span></p>
+    <p>
+      GST Report Generator is a digital software service. No physical goods are shipped. All services
+      and deliverables (such as JSON/Excel files) are generated and delivered digitally within the web application.
+    </p>
 
-    <p>This is a digital service. No physical shipping is involved. All features are delivered online within the app.</p>
-
-    <h5>Access Delivery</h5>
+    <h5>Digital Delivery</h5>
     <ul>
-      <li>Access is granted immediately after successful signup or subscription purchase.</li>
-      <li>Invoices/receipts are sent to your registered email.</li>
+      <li>Access is provided immediately after signup/login.</li>
+      <li>Reports are generated on demand from your uploaded data.</li>
+      <li>No shipping charges apply.</li>
     </ul>
 
-    <h5>Support</h5>
-    <p>For any access issues or questions, contact: <a href="mailto:rakeshkanojia96@gmail.com">rakeshkanojia96@gmail.com</a></p>
-  </main>
-
-  <footer class="mt-auto py-4 bg-dark text-white text-center">
-    <div class="container">
-      <small>© <span id="year"></span> GST Report Generator. All rights reserved.</small>
-    </div>
-  </footer>
-
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-  </script>
+    <p class="mt-4"><a class="btn btn-outline-primary" href="./index.html">Back to App</a></p>
+  </div>
 </body>
 </html>

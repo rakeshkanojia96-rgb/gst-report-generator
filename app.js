@@ -1301,7 +1301,7 @@ class GSTReportGenerator {
                 data.supeco.forEach(row => {
                     if (!row['Platform']) return;
                     
-                    const etin = row['Platform'] === 'Amazon' ? '27AAICA3918J1CT' : row['Platform'] === 'Flipkart' ? '27AACCF0683K1ZH' : '27AACCF6368D1CX';
+                    const etin = row['Platform'] === 'Amazon' ? '27AAICA3918J1CT' : row['Platform'] === 'Flipkart' ? '27AACCF0683K1CS' : '27AACCF6368D1CX';
                     
                     const suppval = parseFloat(row['Taxable Value (₹)']) || 0;
                     const igst = parseFloat(row['Integrated Tax (₹)']) || 0;
@@ -2104,7 +2104,7 @@ class GSTReportGenerator {
             ['Nature of Supply', 'GSTIN of E-Commerce Operator', 'E-Commerce Operator Name', 'Net value of supplies', 'Integrated tax', 'Central tax', 'State/UT tax', 'Cess'],
             ...supecoData.map(row => [
                 'Liable to collect tax u/s 52(TCS)',
-                (row['Platform'] === 'Amazon') ? '27AAICA3918J1CT' : (row['Platform'] === 'Flipkart') ? '27AACCF0683K1ZH' : '27AACCF6368D1CX',
+                (row['Platform'] === 'Amazon') ? '27AAICA3918J1CT' : (row['Platform'] === 'Flipkart') ? '27AACCF0683K1CS' : '27AACCF6368D1CX',
                 (row['Platform'] || '').toLowerCase(),
                 row['Taxable Value (₹)'] || 0,
                 row['Integrated Tax (₹)'] || 0,

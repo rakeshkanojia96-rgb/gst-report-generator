@@ -18,6 +18,28 @@ class AuthSystem {
         this.showLoginFirstFlow();
     }
 
+    getApiBase() {
+        return ((window.API_BASE || '').trim()).replace(/\/$/, '');
+    }
+
+    async apiFetch(path, options = {}) {
+        const apiBase = this.getApiBase();
+        const isGitHubPages = window.location.hostname.endsWith('github.io');
+
+        if (!apiBase && isGitHubPages) {
+            throw new Error('Login backend is not configured for GitHub Pages. Open the site once with ?api=https://your-backend-url and try again.');
+        }
+
+        const response = await fetch(`${apiBase}${path}`, options);
+        const text = await response.text();
+
+        try {
+            return text ? JSON.parse(text) : {};
+        } catch (error) {
+            throw new Error('Login backend returned a web page instead of data. Please check the API backend URL.');
+        }
+    }
+
     checkExistingSession() {
         const savedUser = localStorage.getItem('gst_user_session');
         if (savedUser) {
@@ -516,16 +538,14 @@ class AuthSystem {
 
     async loginUser(email, password) {
         try {
-            const response = await fetch('/api/auth/login', {
+            const result = await this.apiFetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ email, password })
             });
-            
-            const result = await response.json();
-            
+
             if (result.success && result.session_token) {
                 // Store session token
                 localStorage.setItem('gst_session_token', result.session_token);
@@ -542,15 +562,13 @@ class AuthSystem {
 
     async registerUser(userData) {
         try {
-            const response = await fetch('/api/auth/register', {
+            return await this.apiFetch('/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(userData)
             });
-            
-            return await response.json();
         } catch (error) {
             return {
                 success: false,
@@ -567,7 +585,7 @@ class AuthSystem {
             const sessionToken = localStorage.getItem('gst_session_token');
             
             if (sessionToken) {
-                await fetch('/api/auth/logout', {
+                await this.apiFetch('/api/auth/logout', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${sessionToken}`,
@@ -992,7 +1010,7 @@ class AuthSystem {
     async updateUserProfile(profileData) {
         try {
             const sessionToken = localStorage.getItem('gst_session_token');
-            const response = await fetch('/api/auth/profile', {
+            return await this.apiFetch('/api/auth/profile', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1000,8 +1018,6 @@ class AuthSystem {
                 },
                 body: JSON.stringify(profileData)
             });
-            
-            return await response.json();
         } catch (error) {
             return {
                 success: false,
@@ -1013,7 +1029,7 @@ class AuthSystem {
     async changeUserPassword(passwordData) {
         try {
             const sessionToken = localStorage.getItem('gst_session_token');
-            const response = await fetch('/api/auth/change-password', {
+            return await this.apiFetch('/api/auth/change-password', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1021,8 +1037,6 @@ class AuthSystem {
                 },
                 body: JSON.stringify(passwordData)
             });
-            
-            return await response.json();
         } catch (error) {
             return {
                 success: false,

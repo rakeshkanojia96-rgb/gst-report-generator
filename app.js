@@ -275,6 +275,13 @@ class GSTReportGenerator {
         return null;
     }
 
+    hasNewMeeshoReturnFormat() {
+        const sample = this.processedData.meesho.tcs_sales_return?.[0];
+        if (!sample) return false;
+        const headers = Object.keys(sample).map(header => header.toLowerCase().trim());
+        return headers.includes('manifest_date') || headers.includes('eco_tcs_gstin') || headers.includes('transaction_type');
+    }
+
     async processExcelFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -513,7 +520,13 @@ class GSTReportGenerator {
         
         validHsnTransactions.forEach(row => {
             const hsn = row['Hsn/sac'] || '620821';
-            const quantity = parseFloat(row['Quantity'] || 1);
+            const useNewMeeshoReturnFormat = this.hasNewMeeshoReturnFormat();
+            let quantity = parseFloat(row['Quantity'] || 1);
+            if (useNewMeeshoReturnFormat && hsn === '620821') {
+                quantity = 0;
+            } else if (useNewMeeshoReturnFormat && row['Transaction Type'] === 'Refund') {
+                quantity = -quantity;
+            }
             const taxExclusiveGross = parseFloat(row['Tax Exclusive Gross'] || 0);
             const cgstTax = parseFloat(row['Cgst Tax'] || 0);
             const sgstTax = parseFloat(row['Sgst Tax'] || 0);
@@ -915,13 +928,25 @@ class GSTReportGenerator {
             hsnWiseData[hsnKey]['Cess (₹)'] += (entry['Cess (₹)'] || 0);
         });
         
-        const consolidated = Object.values(hsnWiseData).map(entry => ({
-            ...entry,
-            'Taxable Value (₹)': Math.round(entry['Taxable Value (₹)'] * 100) / 100,
-            'Integrated Tax (₹)': Math.round(entry['Integrated Tax (₹)'] * 100) / 100,
-            'Central Tax (₹)': Math.round(entry['Central Tax (₹)'] * 100) / 100,
-            'State Tax (₹)': Math.round(entry['State Tax (₹)'] * 100) / 100
-        }));
+        const consolidated = Object.values(hsnWiseData).map(entry => {
+            const taxableValue = Math.round(entry['Taxable Value (₹)'] * 100) / 100;
+            const centralTax = Math.round(entry['Central Tax (₹)'] * 100) / 100;
+            const stateTax = Math.round(entry['State Tax (₹)'] * 100) / 100;
+            let integratedTax = Math.round(entry['Integrated Tax (₹)'] * 100) / 100;
+            const expectedIntegratedTax = Math.round(((taxableValue * (entry['Rate (%)'] || 0)) / 100 - centralTax - stateTax) * 100) / 100;
+
+            if (Math.abs(expectedIntegratedTax - integratedTax) > 0.05) {
+                integratedTax = Math.round((expectedIntegratedTax - 0.01) * 100) / 100;
+            }
+
+            return {
+                ...entry,
+                'Taxable Value (₹)': taxableValue,
+                'Integrated Tax (₹)': integratedTax,
+                'Central Tax (₹)': centralTax,
+                'State Tax (₹)': stateTax
+            };
+        });
         
         console.log(`Consolidated ${hsnArray.length} HSN entries into ${consolidated.length} HSN code entries`);
         consolidated.forEach(entry => {
@@ -933,6 +958,7 @@ class GSTReportGenerator {
     processMeeshoHSNData() {
         console.log('Processing Meesho data for HSN sheet...');
         const hsnData = {};
+        const useNewReturnFormat = this.hasNewMeeshoReturnFormat();
         
         // Process TCS Sales for HSN - count total rows (simple count)
         if (this.processedData.meesho.tcs_sales) {
@@ -943,6 +969,9 @@ class GSTReportGenerator {
             
             this.processedData.meesho.tcs_sales.forEach(row => {
                 const hsn = row['hsn_code'] || '620821'; // Use hsn_code column F
+                const quantity = useNewReturnFormat && hsn === '620821'
+                    ? 1
+                    : parseFloat(row['quantity'] || 1);
                 const taxableValue = parseFloat(row['total_taxable_sale_value'] || 0);
                 const gstRate = parseFloat(row['gst_rate'] || 5);
                 
@@ -957,6 +986,7 @@ class GSTReportGenerator {
                     };
                 }
                 
+                hsnData[hsn].quantity += quantity;
                 hsnData[hsn].taxableValue += taxableValue;
                 
                 // Calculate taxes based on rate and state (only for positive values)
@@ -975,12 +1005,6 @@ class GSTReportGenerator {
                 }
             });
             
-            // Sum actual 'quantity' column per HSN code (not row count)
-            this.processedData.meesho.tcs_sales.forEach(row => {
-                const hsn = row['hsn_code'] || '620821';
-                const qty = parseFloat(row['quantity'] || 1);
-                if (hsnData[hsn]) hsnData[hsn].quantity += qty;
-            });
             console.log(`Meesho HSN quantities from tcs_sales quantity column:`, Object.fromEntries(Object.entries(hsnData).map(([k,v]) => [k, v.quantity])));
         }
         
@@ -989,7 +1013,7 @@ class GSTReportGenerator {
             console.log(`Processing ${this.processedData.meesho.tcs_sales_return.length} TCS Sales Return records for HSN`);
             
             this.processedData.meesho.tcs_sales_return.forEach(row => {
-                const hsn = '620821';
+                const hsn = useNewReturnFormat ? (row['hsn_code'] || '620821') : '620821';
                 const taxableValue = parseFloat(row['total_taxable_sale_value'] || 0);
                 const gstRate = parseFloat(row['gst_rate'] || 5);
                 
@@ -1006,6 +1030,9 @@ class GSTReportGenerator {
                 
                 // Keep quantity based on outward sales quantity. Returns reduce value
                 // and tax under the return adjustment HSN.
+                if (useNewReturnFormat && hsn === '620821') {
+                    hsnData[hsn].quantity -= 1;
+                }
                 hsnData[hsn].taxableValue -= taxableValue;
                 
                 // Calculate tax deductions (only for positive values)

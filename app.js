@@ -228,12 +228,16 @@ class GSTReportGenerator {
                 console.log(`=== ${file.name} SAMPLE DATA ===`, data[0]);
             }
 
-            if (file.name.toLowerCase().includes('tcs_sales_return')) {
+            const meeshoReportType = this.classifyMeeshoFile(file, data);
+
+            if (meeshoReportType === 'tcs_sales_return') {
                 this.processedData.meesho.tcs_sales_return.push(...data);
-            } else if (file.name.toLowerCase().includes('tcs_sales')) {
+            } else if (meeshoReportType === 'tcs_sales') {
                 this.processedData.meesho.tcs_sales.push(...data);
-            } else if (file.name.toLowerCase().includes('tax_invoice_details')) {
+            } else if (meeshoReportType === 'tax_invoice_details') {
                 this.processedData.meesho.tax_invoice_details.push(...data);
+            } else {
+                console.warn(`Could not identify Meesho report type for ${file.name}`);
             }
         }
         
@@ -241,6 +245,34 @@ class GSTReportGenerator {
         console.log(`- TCS Sales: ${this.processedData.meesho.tcs_sales.length} records`);
         console.log(`- TCS Sales Return: ${this.processedData.meesho.tcs_sales_return.length} records`);
         console.log(`- Tax Invoice Details: ${this.processedData.meesho.tax_invoice_details.length} records`);
+    }
+
+    classifyMeeshoFile(file, data) {
+        const fileName = file.name.toLowerCase();
+        const headers = data && data.length > 0
+            ? Object.keys(data[0]).map(header => header.toLowerCase().trim())
+            : [];
+        const hasHeader = (header) => headers.includes(header.toLowerCase());
+
+        if (fileName.includes('tcs_sales_return') || hasHeader('cancel_return_date')) {
+            return 'tcs_sales_return';
+        }
+
+        if (
+            fileName.includes('tax_invoice_details') ||
+            (hasHeader('invoice no.') && hasHeader('type') && (hasHeader('hsn') || hasHeader('product description')))
+        ) {
+            return 'tax_invoice_details';
+        }
+
+        if (
+            fileName.includes('tcs_sales') ||
+            (hasHeader('hsn_code') && hasHeader('total_taxable_sale_value') && hasHeader('end_customer_state_new'))
+        ) {
+            return 'tcs_sales';
+        }
+
+        return null;
     }
 
     async processExcelFile(file) {
@@ -472,21 +504,20 @@ class GSTReportGenerator {
         // Process HSN data - use Tax Exclusive Gross and fix rate calculation
         const hsnData = {};
         
-        // Shipment = +Quantity/+Value, Refund = -Quantity/-Value, Cancel = skip
-        const shipmentRows = amazonData.filter(row => row['Transaction Type'] === 'Shipment');
-        const refundRows = amazonData.filter(row => row['Transaction Type'] === 'Refund');
-        
-        const validHsnTransactions = [...shipmentRows, ...refundRows];
+        // Shipment and refund rows both count as report rows for HSN quantity. Other
+        // zero-value transaction types such as FreeReplacement should not inflate it.
+        const validHsnTransactions = amazonData.filter(row => {
+            const transactionType = row['Transaction Type'];
+            return transactionType === 'Shipment' || transactionType === 'Refund';
+        });
         
         validHsnTransactions.forEach(row => {
             const hsn = row['Hsn/sac'] || '620821';
-            const isRefund = row['Transaction Type'] === 'Refund';
-            const sign = isRefund ? -1 : 1;
-            const quantity = sign * parseFloat(row['Quantity'] || 1);
-            const taxExclusiveGross = sign * parseFloat(row['Tax Exclusive Gross'] || 0);
-            const cgstTax = sign * parseFloat(row['Cgst Tax'] || 0);
-            const sgstTax = sign * parseFloat(row['Sgst Tax'] || 0);
-            const igstTax = sign * parseFloat(row['Igst Tax'] || 0);
+            const quantity = parseFloat(row['Quantity'] || 1);
+            const taxExclusiveGross = parseFloat(row['Tax Exclusive Gross'] || 0);
+            const cgstTax = parseFloat(row['Cgst Tax'] || 0);
+            const sgstTax = parseFloat(row['Sgst Tax'] || 0);
+            const igstTax = parseFloat(row['Igst Tax'] || 0);
             
             // Calculate tax rate properly: (CGST + SGST) * 100 or IGST * 100
             let taxRate = 5; // Default rate
@@ -973,7 +1004,8 @@ class GSTReportGenerator {
                     };
                 }
                 
-                hsnData[hsn].quantity -= parseFloat(row['quantity'] || 1); // Subtract actual quantity
+                // Keep quantity based on outward sales quantity. Returns reduce value
+                // and tax under the return adjustment HSN.
                 hsnData[hsn].taxableValue -= taxableValue;
                 
                 // Calculate tax deductions (only for positive values)
@@ -995,8 +1027,8 @@ class GSTReportGenerator {
         
         const meeshoHSN = [];
         Object.entries(hsnData).forEach(([hsn, data]) => {
-            const finalQuantity = Math.round(data.quantity);
-            console.log(`Meesho HSN ${hsn}: Net Qty=${finalQuantity}, Value=${data.taxableValue}`);
+            const finalQuantity = Math.round(data.quantity * 100) / 100;
+            console.log(`Meesho HSN ${hsn}: Qty=${finalQuantity}, Value=${data.taxableValue}`);
             meeshoHSN.push({
                 'HSN Code': hsn,
                 'Description': 'OF COTTON',

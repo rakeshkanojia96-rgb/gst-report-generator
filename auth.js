@@ -857,6 +857,13 @@ class AuthSystem {
 
     skipAuth() {
         // For testing purposes - bypass authentication
+        const gstinField = document.getElementById('gstin');
+        if (gstinField && !gstinField.value.trim()) {
+            gstinField.value = '27CJAPK3544E1ZH';
+            gstinField.readOnly = false;
+            gstinField.style.backgroundColor = '';
+            gstinField.style.cursor = '';
+        }
         this.showGSTInterface();
         this.showSuccessMessage('Authentication bypassed for testing');
     }

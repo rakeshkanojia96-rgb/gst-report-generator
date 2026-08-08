@@ -282,6 +282,11 @@ class GSTReportGenerator {
         return headers.includes('manifest_date') || headers.includes('eco_tcs_gstin') || headers.includes('transaction_type');
     }
 
+    getEnteredGSTIN() {
+        const gstinInput = document.getElementById('gstin');
+        return (gstinInput?.value || '').trim().toUpperCase();
+    }
+
     async processExcelFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -946,7 +951,7 @@ class GSTReportGenerator {
                 'Central Tax (₹)': centralTax,
                 'State Tax (₹)': stateTax
             };
-        });
+        }).filter(entry => entry['Taxable Value (₹)'] > 0);
         
         console.log(`Consolidated ${hsnArray.length} HSN entries into ${consolidated.length} HSN code entries`);
         consolidated.forEach(entry => {
@@ -1261,7 +1266,7 @@ class GSTReportGenerator {
             
             // Create GSTR1 JSON structure
             const gstr1Json = {
-                "gstin": "27CJAPK3544E1ZH",
+                "gstin": this.getEnteredGSTIN(),
                 "fp": `${monthNumber}${year}`,
                 "version": "GST3.2.2",
                 "hash": "hash"
@@ -1317,7 +1322,10 @@ class GSTReportGenerator {
             console.log('DEBUG: All data keys for HSN:', Object.keys(data));
             
             if (data.hsn && Array.isArray(data.hsn)) {
-                data.hsn.forEach((row, index) => {
+                data.hsn.filter(row => {
+                    const txval = parseFloat(row['Taxable Value (₹)'] || row['Taxable Value'] || row['txval'] || 0);
+                    return txval > 0;
+                }).forEach((row, index) => {
                     console.log(`DEBUG: Processing HSN B2C row ${index}:`, row);
                     console.log('DEBUG: Available HSN row keys:', Object.keys(row));
                     
@@ -2112,6 +2120,8 @@ class GSTReportGenerator {
                 ['HSN', 'Description', 'UQC', 'Total Quantity', 'Total Value', 'Rate', 'Taxable Value', 'Integrated Tax Amount', 'Central Tax Amount', 'State/UT Tax Amount', 'Cess Amount']
             ];
         }
+
+        hsnData = hsnData.filter(row => (parseFloat(row['Taxable Value (₹)'] || 0) || 0) > 0);
         
         const totalQuantity = hsnData.reduce((sum, row) => sum + (row['Quantity'] || 0), 0);
         const totalValue = hsnData.reduce((sum, row) => sum + (row['Taxable Value (₹)'] || 0), 0);

@@ -660,14 +660,14 @@ class AuthSystem {
             console.error('User display name element not found or no current user!');
         }
         
-        // Auto-populate GSTIN field with user's GST number and make it readonly
+        // Auto-populate GSTIN field with user's GST number, but keep it editable for filing.
         if (this.currentUser && this.currentUser.gst_number) {
             const gstinField = document.getElementById('gstin');
             if (gstinField) {
                 gstinField.value = this.currentUser.gst_number;
-                gstinField.readOnly = true;
-                gstinField.style.backgroundColor = '#f8f9fa';
-                gstinField.style.cursor = 'not-allowed';
+                gstinField.readOnly = false;
+                gstinField.style.backgroundColor = '';
+                gstinField.style.cursor = '';
                 console.log('GSTIN field populated with:', this.currentUser.gst_number);
             }
         }
@@ -951,14 +951,14 @@ class AuthSystem {
                 document.getElementById('userDisplayName').textContent = 
                     `${this.currentUser.first_name} ${this.currentUser.last_name}`;
                 
-                // Auto-populate GSTIN field with user's GST number and make it readonly
+                // Auto-populate GSTIN field with user's GST number, but keep it editable for filing.
                 if (this.currentUser.gst_number) {
                     const gstinField = document.getElementById('gstin');
                     if (gstinField) {
                         gstinField.value = this.currentUser.gst_number;
-                        gstinField.readOnly = true;
-                        gstinField.style.backgroundColor = '#f8f9fa';
-                        gstinField.style.cursor = 'not-allowed';
+                        gstinField.readOnly = false;
+                        gstinField.style.backgroundColor = '';
+                        gstinField.style.cursor = '';
                     }
                 }
                 

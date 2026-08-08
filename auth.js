@@ -42,14 +42,19 @@ class AuthSystem {
 
     checkExistingSession() {
         const savedUser = localStorage.getItem('gst_user_session');
-        if (savedUser) {
+        const sessionToken = localStorage.getItem('gst_session_token');
+        if (savedUser && sessionToken) {
             try {
                 this.currentUser = JSON.parse(savedUser);
                 this.isAuthenticated = true;
                 this.showAuthenticatedState();
             } catch (e) {
                 localStorage.removeItem('gst_user_session');
+                localStorage.removeItem('gst_session_token');
             }
+        } else {
+            localStorage.removeItem('gst_user_session');
+            localStorage.removeItem('gst_session_token');
         }
     }
 
@@ -797,13 +802,13 @@ class AuthSystem {
                                 <h2 class="mb-4">Welcome to GST Report Generator</h2>
                                 <p class="lead mb-4">
                                     India's most trusted GST compliance tool for e-commerce businesses.
-                                    Generate accurate GSTR1 reports from Amazon and Meesho data.
+                                    Generate accurate GSTR1 reports from Amazon, Meesho and Flipkart data.
                                 </p>
                                 <div class="row mb-4">
                                     <div class="col-md-4">
                                         <i class="fas fa-file-upload fa-2x text-success mb-2"></i>
                                         <h6>Multi-Platform</h6>
-                                        <small>Amazon & Meesho</small>
+                                        <small>Amazon, Meesho & Flipkart</small>
                                     </div>
                                     <div class="col-md-4">
                                         <i class="fas fa-shield-check fa-2x text-info mb-2"></i>

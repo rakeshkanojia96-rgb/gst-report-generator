@@ -287,6 +287,11 @@ class GSTReportGenerator {
         return (gstinInput?.value || '').trim().toUpperCase();
     }
 
+    normalizeHSNForGSTPortal(hsnCode) {
+        const normalized = String(hsnCode || '').trim();
+        return normalized === '62044300' ? '62042999' : normalized;
+    }
+
     async processExcelFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1332,6 +1337,7 @@ class GSTReportGenerator {
                     if (!row['HSN Code'] && !row['HSN'] && !row['hsn']) return;
                     
                     const hsnCode = row['HSN Code'] || row['HSN'] || row['hsn'] || '';
+                    const portalHsnCode = this.normalizeHSNForGSTPortal(hsnCode);
                     const descField = row['Description'] || '';
                     const uqcField = row['UQC'] || row['uqc'] || '';
                     const qtyField = row['Quantity'] || row['Total Quantity'] || row['qty'] || 0;
@@ -1345,7 +1351,7 @@ class GSTReportGenerator {
                     
                     hsnB2cData.push({
                         "num": index + 1,
-                        "hsn_sc": String(hsnCode),
+                        "hsn_sc": portalHsnCode,
                         "desc": String(descField),
                         "uqc": String(uqcField).split('-')[0] || "PCS",
                         "qty": parseInt(qtyField) || 0,
